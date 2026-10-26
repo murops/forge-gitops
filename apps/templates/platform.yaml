@@ -1,0 +1,118 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "argocd" -3) }}
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: {{ .Values.versions.argocd }}
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $repo/bootstrap/argocd-values.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.revision }}
+      ref: repo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "envoy-gateway" -3) }}
+spec:
+  project: default
+  source:
+    repoURL: docker.io/envoyproxy
+    chart: gateway-helm
+    targetRevision: {{ .Values.versions.envoyGateway }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "cloudnative-pg" -3) }}
+spec:
+  project: default
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: cloudnative-pg
+    targetRevision: {{ .Values.versions.cloudnativePG }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "external-secrets" -3) }}
+spec:
+  project: default
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: {{ .Values.versions.externalSecrets }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "keycloak-operator" -3) }}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/keycloak/keycloak-k8s-resources.git
+    path: kubernetes
+    targetRevision: {{ .Values.versions.keycloakOperator }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "gateway" -2) }}
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.revision }}
+    path: platform/gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-gateway-system
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "secret-stores" -2) }}
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.revision }}
+    path: platform/external-secrets
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  {{- include "apps.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "apps.metadata" (list "keycloak" -1) }}
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.revision }}
+    path: platform/keycloak
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  {{- include "apps.syncPolicy" . | nindent 2 }}

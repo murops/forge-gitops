@@ -1,0 +1,106 @@
+global:
+  domain: argocd.localhost
+
+configs:
+  params:
+    # TLS ends at the gateway
+    server.insecure: true
+    # fields defaulted by the API server are not drift
+    controller.diff.server.side: "true"
+  cm:
+    exec.enabled: false
+    timeout.reconciliation: 60s
+    # lets the root app wait for child Applications to be healthy before the next sync wave
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil and obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then
+          hs.message = obj.status.health.message
+        end
+      end
+      return hs
+    resource.customizations.health.k8s.keycloak.org_Keycloak: |
+      hs = { status = "Progressing", message = "Waiting for Keycloak" }
+      if obj.status ~= nil and obj.status.conditions ~= nil then
+        for _, c in ipairs(obj.status.conditions) do
+          if c.type == "Ready" and c.status == "True" then
+            hs.status = "Healthy"
+            hs.message = ""
+          end
+        end
+      end
+      return hs
+    resource.customizations.health.k8s.keycloak.org_KeycloakRealmImport: |
+      hs = { status = "Progressing", message = "Importing realm" }
+      if obj.status ~= nil and obj.status.conditions ~= nil then
+        for _, c in ipairs(obj.status.conditions) do
+          if c.type == "HasErrors" and c.status == "True" then
+            hs.status = "Degraded"
+            hs.message = c.message
+            return hs
+          end
+          if c.type == "Done" and c.status == "True" then
+            hs.status = "Healthy"
+            hs.message = ""
+          end
+        end
+      end
+      return hs
+    # a NodePort gateway never gets an address, so Programmed stays False; the listeners are what matter
+    resource.customizations.health.gateway.networking.k8s.io_Gateway: |
+      hs = { status = "Progressing", message = "Waiting for listeners" }
+      if obj.status == nil or obj.status.listeners == nil then
+        return hs
+      end
+      for _, l in ipairs(obj.status.listeners) do
+        local programmed = false
+        for _, c in ipairs(l.conditions or {}) do
+          if c.type == "Programmed" and c.status == "True" then
+            programmed = true
+          end
+        end
+        if not programmed then
+          return hs
+        end
+      end
+      hs.status = "Healthy"
+      hs.message = ""
+      return hs
+  repositories:
+    forge-charts:
+      type: helm
+      name: forge-charts
+      url: ghcr.io/murops/charts
+      enableOCI: "true"
+    envoyproxy:
+      type: helm
+      name: envoyproxy
+      url: docker.io/envoyproxy
+      enableOCI: "true"
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+server:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi

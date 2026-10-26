@@ -1,0 +1,10 @@
+# where Argo CD reads this repository from, overridden by scripts/up.sh for local testing
+repoURL: https://github.com/murops/forge-gitops.git
+revision: main
+
+versions:
+  argocd: 10.11.0
+  envoyGateway: v1.9.2
+  cloudnativePG: 0.29.1
+  externalSecrets: 2.13.0
+  keycloakOperator: 26.8.1

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: apps
+description: Root app of apps, renders the Argo CD Applications for the platform and the Forge environments
+type: application
+version: 0.1.0
