@@ -48,7 +48,7 @@ jobs:
             echo "tag=$tag"
             echo "chart=$chart"
           } >> "$GITHUB_OUTPUT"
-      # pull requests opened with GITHUB_TOKEN do not trigger the ci workflow, so validate here
+      # ci on a pull request opened by the bot waits for a maintainer to approve it, so validate here too
       - if: steps.copy.outputs.changed == 'true'
         run: scripts/validate.sh
       - name: Open the pull request
