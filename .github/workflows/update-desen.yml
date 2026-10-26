@@ -1,0 +1,71 @@
+name: update-desen
+
+# desen follows the main branch of murops/forge: the image tagged main is resolved to its sha-* tag
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: environments
+  cancel-in-progress: false
+
+env:
+  HELM_VERSION: v4.3.1
+  IMAGE: murops/forge-api
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Resolve the tag of main
+        id: tag
+        run: |
+          token=$(curl -sf "https://ghcr.io/token?scope=repository:$IMAGE:pull" | jq -r .token)
+          digest() {
+            curl -sfI -H "Authorization: Bearer $token" \
+              -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/$IMAGE/manifests/$1" | tr -d '\r' | awk -F': ' 'tolower($1) == "docker-content-digest" {print $2}'
+          }
+          want=$(digest main)
+          for tag in $(curl -sf -H "Authorization: Bearer $token" "https://ghcr.io/v2/$IMAGE/tags/list?n=1000" | jq -r '.tags[] | select(startswith("sha-"))'); do
+            if [ "$(digest "$tag")" = "$want" ]; then
+              echo "tag=$tag" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "no sha tag matches main ($want)" >&2
+          exit 1
+      - name: Update the values
+        id: update
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          current=$(yq .image.tag environments/desen/values.yaml)
+          if [ "$current" = "$TAG" ]; then
+            echo "desen already runs $TAG"
+            exit 0
+          fi
+          yq -i '.image.tag = strenv(TAG)' environments/desen/values.yaml
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "from=$current" >> "$GITHUB_OUTPUT"
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        if: steps.update.outputs.changed == 'true'
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - if: steps.update.outputs.changed == 'true'
+        run: scripts/validate.sh
+      - name: Commit
+        if: steps.update.outputs.changed == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          FROM: ${{ steps.update.outputs.from }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Deploy forge $TAG to desen" -m "Previous: $FROM"
+          git push

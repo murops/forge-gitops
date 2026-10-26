@@ -1,0 +1,71 @@
+name: promote
+
+# copies the image tag and chart version one environment up and opens a pull request for review
+on:
+  workflow_dispatch:
+    inputs:
+      to:
+        description: Environment to promote to
+        type: choice
+        options: [homol, main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: environments
+  cancel-in-progress: false
+
+env:
+  HELM_VERSION: v4.3.1
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Copy the versions
+        id: copy
+        env:
+          TO: ${{ inputs.to }}
+        run: |
+          from=$([ "$TO" = homol ] && echo desen || echo homol)
+          tag=$(yq .image.tag "environments/$from/values.yaml")
+          chart=$(yq .chartVersion "environments/$from/env.yaml")
+          if [ "$(yq .image.tag "environments/$TO/values.yaml")" = "$tag" ] && [ "$(yq .chartVersion "environments/$TO/env.yaml")" = "$chart" ]; then
+            echo "$TO already runs $tag with chart $chart"
+            exit 0
+          fi
+          TAG=$tag yq -i '.image.tag = strenv(TAG)' "environments/$TO/values.yaml"
+          CHART=$chart yq -i '.chartVersion = strenv(CHART)' "environments/$TO/env.yaml"
+          {
+            echo "changed=true"
+            echo "from=$from"
+            echo "tag=$tag"
+            echo "chart=$chart"
+          } >> "$GITHUB_OUTPUT"
+      # pull requests opened with GITHUB_TOKEN do not trigger the ci workflow, so validate here
+      - if: steps.copy.outputs.changed == 'true'
+        run: scripts/validate.sh
+      - name: Open the pull request
+        if: steps.copy.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TO: ${{ inputs.to }}
+          FROM: ${{ steps.copy.outputs.from }}
+          TAG: ${{ steps.copy.outputs.tag }}
+          CHART: ${{ steps.copy.outputs.chart }}
+        run: |
+          branch="promote/$TO-$TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Promote forge $TAG to $TO"
+          git push -f origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Promote forge $TAG to $TO" \
+            --body "Promotes image \`$TAG\` and chart \`$CHART\` from $FROM to $TO. Manifests were rendered and validated by the promote workflow."

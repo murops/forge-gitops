@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v4.3.1
+  TRIVY_IMAGE: aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - run: scripts/validate.sh
+        env:
+          RENDER_DIR: rendered
+      - name: Scan the rendered manifests
+        run: docker run --rm -v "$PWD/rendered:/src:ro" "$TRIVY_IMAGE" config --exit-code 1 --severity HIGH,CRITICAL /src
+      - run: docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE"
