@@ -1,0 +1,84 @@
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: client-secret
+spec:
+  length: 40
+  digits: 8
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+# generated once, the Forge environments read it through the keycloak ClusterSecretStore
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: forge-web-client
+spec:
+  refreshInterval: "0"
+  target:
+    name: forge-web-client
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: client-secret
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: forge
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  keycloakCRName: keycloak
+  placeholders:
+    FORGE_WEB_SECRET:
+      secret:
+        name: forge-web-client
+        key: password
+  realm:
+    realm: forge
+    enabled: true
+    sslRequired: none
+    registrationAllowed: false
+    accessTokenLifespan: 900
+    clients:
+      - clientId: forge-web
+        name: Forge
+        enabled: true
+        publicClient: false
+        secret: ${FORGE_WEB_SECRET}
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        redirectUris:
+          - http://forge.localhost/*
+          - http://homol.forge.localhost/*
+          - http://desen.forge.localhost/*
+        webOrigins:
+          - http://forge.localhost
+          - http://homol.forge.localhost
+          - http://desen.forge.localhost
+        attributes:
+          post.logout.redirect.uris: http://forge.localhost/*##http://homol.forge.localhost/*##http://desen.forge.localhost/*
+        protocolMappers:
+          - name: forge-api-audience
+            protocol: openid-connect
+            protocolMapper: oidc-audience-mapper
+            config:
+              included.custom.audience: forge-api
+              access.token.claim: "true"
+              id.token.claim: "false"
+    # demo user for the local cluster
+    users:
+      - username: dev
+        email: dev@forge.local
+        emailVerified: true
+        firstName: Dev
+        lastName: User
+        enabled: true
+        credentials:
+          - type: password
+            value: dev
+            temporary: false
