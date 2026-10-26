@@ -1,0 +1,21 @@
+# the environments can only deploy the chart and this repository into the forge namespaces
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: forge
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  description: Forge environments
+  sourceRepos:
+    - {{ .Values.repoURL }}
+    - ghcr.io/murops/charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: forge
+    - server: https://kubernetes.default.svc
+      namespace: forge-*
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

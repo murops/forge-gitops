@@ -1,0 +1,16 @@
+oidc:
+  issuer: http://keycloak.localhost/realms/forge
+
+# created by CloudNativePG for the forge-db cluster
+database:
+  existingSecret: forge-db-app
+
+frontend:
+  auth:
+    existingSecret: forge-frontend
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system

@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+patches:
+  # a standby replica on another node
+  - target:
+      kind: Cluster
+      name: forge-db
+    patch: |
+      - op: replace
+        path: /spec/instances
+        value: 2

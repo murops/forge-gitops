@@ -1,0 +1,68 @@
+{{- /* one pair of Applications per environments/<env>/env.yaml: the database and secrets first, then the chart */}}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: forge-deps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repoURL }}
+        revision: {{ .Values.revision }}
+        files:
+          - path: environments/*/env.yaml
+  template:
+    metadata:
+      name: {{`forge-{{ .name }}-deps`}}
+      labels:
+        forge.murops.dev/environment: {{`"{{ .name }}"`}}
+    spec:
+      project: forge
+      source:
+        repoURL: {{ .Values.repoURL }}
+        targetRevision: {{ .Values.revision }}
+        path: {{`environments/{{ .path.basename }}`}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: {{`"{{ .namespace }}"`}}
+      {{- include "apps.syncPolicy" . | nindent 6 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: forge
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: {{ .Values.repoURL }}
+        revision: {{ .Values.revision }}
+        files:
+          - path: environments/*/env.yaml
+  template:
+    metadata:
+      name: {{`forge-{{ .name }}`}}
+      labels:
+        forge.murops.dev/environment: {{`"{{ .name }}"`}}
+    spec:
+      project: forge
+      sources:
+        - repoURL: ghcr.io/murops/charts
+          chart: forge
+          targetRevision: {{`"{{ .chartVersion }}"`}}
+          helm:
+            releaseName: forge
+            valueFiles:
+              - $repo/environments/common-values.yaml
+              - {{`$repo/environments/{{ .path.basename }}/values.yaml`}}
+        - repoURL: {{ .Values.repoURL }}
+          targetRevision: {{ .Values.revision }}
+          ref: repo
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: {{`"{{ .namespace }}"`}}
+      {{- include "apps.syncPolicy" . | nindent 6 }}

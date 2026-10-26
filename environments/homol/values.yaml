@@ -1,0 +1,15 @@
+image:
+  tag: sha-8ffdc52
+
+logLevel: info
+
+api:
+  replicas: 1
+
+frontend:
+  replicas: 1
+  url: http://homol.forge.localhost
+
+httpRoute:
+  hostnames:
+    - homol.forge.localhost
