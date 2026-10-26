@@ -1,5 +1,5 @@
 image:
-  tag: sha-8ffdc52
+  tag: sha-a53e5be
 logLevel: info
 api:
   replicas: 1
