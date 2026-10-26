@@ -1,15 +1,11 @@
 image:
-  tag: sha-8ffdc52
-
+  tag: sha-a53e5be
 logLevel: debug
-
 api:
   replicas: 1
-
 frontend:
   replicas: 1
   url: http://desen.forge.localhost
-
 httpRoute:
   hostnames:
     - desen.forge.localhost
