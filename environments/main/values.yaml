@@ -1,9 +1,7 @@
 image:
   tag: 0.1.0
-
 frontend:
   url: http://forge.localhost
-
 httpRoute:
   hostnames:
     - forge.localhost
