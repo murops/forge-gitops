@@ -1,5 +1,5 @@
 image:
-  tag: sha-a53e5be
+  tag: sha-e72daa7
 logLevel: debug
 api:
   replicas: 1
